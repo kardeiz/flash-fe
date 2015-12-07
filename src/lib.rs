@@ -2,7 +2,6 @@ extern crate iron;
 extern crate cookie_fe;
 extern crate session_fe;
 extern crate rustc_serialize;
-extern crate persistent;
 
 use std::borrow::ToOwned;
 use std::collections::BTreeMap;
@@ -16,8 +15,6 @@ use iron::{Handler, AroundMiddleware, typemap};
 
 use cookie_fe::{CookieWrapper, WithCookieJar, CookiePair};
 use session_fe::{SessionUtil, WithSession};
-
-use persistent::{State, Read};
 
 #[derive(Clone, Debug)]
 pub struct FlashUtil {

@@ -5,7 +5,6 @@ extern crate session_fe;
 extern crate flash_fe;
 
 extern crate router;
-extern crate persistent;
 extern crate rustc_serialize;
 extern crate time;
 
@@ -21,8 +20,6 @@ use flash_fe::{FlashUtil, WithFlash};
 use std::collections::{BTreeMap, HashMap};
 
 use rustc_serialize::json::{self, ToJson};
-
-use persistent::{Read, Write, State};
 
 const KEY: &'static [u8] = b"4b8eee793a846531d6d95dd66ae48319";
 
