@@ -1,0 +1,19 @@
+[package]
+name = "flash-fe"
+version = "0.1.0"
+authors = ["kardeiz <kardeiz@gmail.com>"]
+
+[dependencies]
+iron = "0.2"
+rustc-serialize = "0.3"
+persistent = "0.0.6"
+
+[dependencies.cookie-fe]
+path = "../cookie-fe"
+
+[dependencies.session-fe]
+path = "../session-fe"
+
+[dev-dependencies]
+time = "*"
+router = "*"
