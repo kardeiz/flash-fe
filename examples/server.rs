@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate iron;
 
 extern crate cookie_fe;
@@ -7,62 +8,96 @@ extern crate flash_fe;
 extern crate router;
 extern crate rustc_serialize;
 extern crate time;
+extern crate rand; 
 
 use iron::prelude::*;
 use iron::{status, AroundMiddleware};
 
 use router::Router;
 
-use cookie_fe::{CookieWrapper, WithCookieJar, CookiePair};
-use session_fe::{SessionUtil, WithSession};
-use flash_fe::{FlashUtil, WithFlash};
+use cookie_fe::{Util as CookieUtil, Builder as CookieBuilder, CookiePair};
+use session_fe::{Util as SessionUtil, Builder as SessionBuilder};
+use flash_fe::{Util as FlashUtil, Builder as FlashBuilder};
 
 use std::collections::{BTreeMap, HashMap};
 
 use rustc_serialize::json::{self, ToJson};
+use rustc_serialize::hex::{self, ToHex};
+
+use rand::{thread_rng, Rng};
 
 const KEY: &'static [u8] = b"4b8eee793a846531d6d95dd66ae48319";
 
-fn a(req: &mut Request) -> IronResult<Response> {
+pub struct Helper;
 
-  let mut res = Response::with((status::Ok, "Set session"));
+impl Helper {
 
-  let mut map = BTreeMap::new();
+    pub fn random() -> String {
+        let mut v = [0; 16];
+        rand::thread_rng().fill_bytes(&mut v);
+        v.to_hex()
+    }
 
-  map.insert("foo".to_string(), 23.to_json());
-
-  req.set_flash(map);
-  
-  Ok(res)
+    fn key(sid: Option<&'static str>) -> Box<Fn(&mut Request) -> String + Send + Sync> {
+        let out = move |req: &mut Request| -> String {
+            let jar = req.extensions.get_mut::<CookieUtil>()
+                .and_then(|x| x.jar() )
+                .expect("No cookie jar");
+            let sid = sid.unwrap_or("IRONSID");
+            if let Some(cookie) = jar.signed().find(sid) {
+                cookie.value
+            } else {
+                let key = Self::random();
+                let cookie = CookiePair::new(sid.to_owned(), key.clone());
+                jar.signed().add(cookie);
+                key
+            }
+        };
+        Box::new(out)        
+    }
 }
 
-fn b(req: &mut Request) -> IronResult<Response> {
 
-  let mut res = Response::new();
+fn set(req: &mut Request) -> IronResult<Response> {
 
-  let flash = req.get_flash();
+    let mut res = Response::with((status::Ok, "Set flash"));
 
-  res
-    .set_mut(status::Ok)
-    .set_mut(format!("{:?}", flash));
+    let mut map = BTreeMap::new();
 
-  Ok(res)
+    map.insert("foo".to_string(), 23.to_json());
+
+    iexpect!(req.extensions.get_mut::<FlashUtil>()).set(map.to_json() );
+
+    Ok(res)
+}
+
+fn get(req: &mut Request) -> IronResult<Response> {
+
+    let mut res = Response::new();
+
+    let flash = iexpect!(req.extensions.get::<FlashUtil>()).get();
+
+    res
+        .set_mut(status::Ok)
+        .set_mut(format!("{:?}", flash));
+
+    Ok(res)
 }
 
 fn main() {
 
-  let session_util = SessionUtil::new();
+    let sessioning = SessionBuilder::new(Helper::key(None));
 
-  let mut router = Router::new();
-  router.get("/a", a);
-  router.get("/b", b);
-  
-  let flashed = FlashUtil::new(None).around(Box::new(router));
-  let cookied = CookieWrapper(KEY).around(flashed);
+    let mut router = Router::new();
+    router.get("/get", get);
+    router.get("/set", set);
 
-  let mut chain = Chain::new(cookied);
+    let flashed = FlashBuilder(None).around(Box::new(router));
 
-  chain.link_before(session_util);
+    let mut chain = Chain::new(flashed);
+    chain.link_before(sessioning);
 
-  Iron::new(chain).http("0.0.0.0:3000").unwrap();
+    let cookied = CookieBuilder(KEY).around(Box::new(chain));
+
+    Iron::new(cookied).http("0.0.0.0:3000").unwrap();
 }

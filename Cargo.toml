@@ -1,18 +1,15 @@
 [package]
 name = "flash-fe"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["kardeiz <kardeiz@gmail.com>"]
 
 [dependencies]
 iron = "0.2"
 rustc-serialize = "0.3"
-
-[dependencies.cookie-fe]
-path = "../cookie-fe"
-
-[dependencies.session-fe]
-path = "../session-fe"
+session-fe = { git = "https://github.com/kardeiz/session-fe" }
 
 [dev-dependencies]
 time = "*"
 router = "*"
+cookie-fe = { git = "https://github.com/kardeiz/cookie-fe" }
+rand = "0.3.12"

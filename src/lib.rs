@@ -1,126 +1,106 @@
 extern crate iron;
-extern crate cookie_fe;
 extern crate session_fe;
 extern crate rustc_serialize;
 
-use std::borrow::ToOwned;
-use std::collections::BTreeMap;
-
 use std::sync::{Arc, RwLock};
+use std::collections::BTreeMap;
 
 use rustc_serialize::json::{self, ToJson};
 
 use iron::prelude::*;
 use iron::{Handler, AroundMiddleware, typemap};
 
-use cookie_fe::{CookieWrapper, WithCookieJar, CookiePair};
-use session_fe::{SessionUtil, WithSession};
+use session_fe::Util as SessionUtil;
 
 #[derive(Clone, Debug)]
-pub struct FlashUtil {
-  pub _key: Option<String>,
-  pub now: Arc<RwLock<Option<json::Object>>>,
-  pub next: Arc<RwLock<Option<json::Object>>>
+pub struct Util {
+    pub key: &'static str,
+    pub now: Option<json::Json>,
+    pub next: Option<json::Json>
 }
 
-impl FlashUtil {
-  
-  pub fn new(_key: Option<String>) -> Self {
-    FlashUtil { 
-      _key: _key, 
-      now: Arc::new(RwLock::new(None)), 
-      next: Arc::new(RwLock::new(None))
-    }
-  }
+impl Util {
 
-  pub fn key(&self) -> String {
-    self._key.clone()
-      .unwrap_or_else(|| "flash".to_string() )
-  }
-
-  pub fn rotate_in(&self, req: &Request) -> FlashUtil {
-    let flash = req.get_session().as_ref()
-      .and_then(|session| session.get(&self.key()))
-      .and_then(|flash| flash.as_object() )
-      .map(|flash| flash.to_owned() );
-    FlashUtil { 
-      _key: self._key.clone(), // as_ref().map(|x| x.clone()),
-      now: Arc::new(RwLock::new(flash)),
-      next: Arc::new(RwLock::new(None))
-    }
-  }
-
-  pub fn rotate_out(&self, req: &Request) {
-    let flash = self.next.read().ok()
-      .and_then(|x| (*x).clone() );
-
-    let mut session = req.get_session()
-      .unwrap_or_else(|| BTreeMap::new() );
-    session.insert(self.key(), flash.to_json());
-    req.set_session(session);
-  }
-
-}
-
-
-impl typemap::Key for FlashUtil { type Value = FlashUtil; }
-
-struct FlashRotator<H: Handler> {
-  handler: H,
-  flash_util: FlashUtil
-}
-
-impl<H: Handler> Handler for FlashRotator<H> {
-  fn handle(&self, req: &mut Request) -> IronResult<Response> {
-    
-    let flash_util = self.flash_util.rotate_in(req);
-
-    req.extensions.insert::<FlashUtil>(flash_util);
-
-    let res = self.handler.handle(req);
-
-    if res.is_ok() {
-      req.extensions.get::<FlashUtil>().unwrap().rotate_out(req);
+    pub fn new(key: Option<&'static str>) -> Self {
+        Util { 
+            key: key.unwrap_or("iron.flash"), 
+            now: None,
+            next: None
+        }
     }
 
-    res
-  }
+    pub fn rotate_in(&mut self, req: &Request) {
+        if let Some(mut obj) = req.extensions.get::<SessionUtil>()
+            .and_then(|s| s.get() ) {
+            if let Some(flash) = obj.remove(self.key) {
+                self.now = Some(flash);
+            }
+        }  
+    }
+
+
+    pub fn rotate_out(&self, req: &Request) {
+        if let Some(sess) = req.extensions.get::<SessionUtil>() {
+            if let Some(next) = self.next.clone() {
+                let mut map = sess.get()
+                    .unwrap_or_else(|| json::Object::new());
+                map.insert(self.key.to_owned(), next);
+                sess.set(map);
+            } else {
+                if let Some(mut map) = sess.get() {
+                    if map.remove(self.key).is_some() {
+                        sess.set(map);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn get(&self) -> Option<json::Json> {
+        self.now.clone()
+    }
+
+    pub fn set(&mut self, value: json::Json) {
+        self.next = Some(value);
+    }
+
 }
 
-impl AroundMiddleware for FlashUtil {
-  fn around(self, handler: Box<Handler>) -> Box<Handler> {
-    Box::new(FlashRotator {
-      handler: handler,
-      flash_util: self
-    }) as Box<Handler>
-  }
+impl typemap::Key for Util { type Value = Self; }
+
+pub struct Builder(pub Option<&'static str>);
+
+struct Rotator<H: Handler> {
+    handler: H,
+    builder: Builder
 }
 
-pub trait WithFlash {
-  fn get_flash(&self) -> Option<json::Object>;
-  fn set_flash(&self, json::Object);
+impl<H: Handler> Handler for Rotator<H> {
+    fn handle(&self, req: &mut Request) -> IronResult<Response> {
+
+        let mut util = Util::new(self.builder.0);
+
+        util.rotate_in(req);
+
+        req.extensions.insert::<Util>(util);
+
+        let res = self.handler.handle(req);
+
+        if res.is_ok() {
+            if let Some(util) = req.extensions.get::<Util>() {
+                util.rotate_out(req);
+            }
+        }
+
+        res
+    }
 }
 
-impl<'a, 'b> WithFlash for Request<'a, 'b> {
-
-  fn get_flash(&self) -> Option<json::Object> {
-    let flash_util = 
-      self.extensions.get::<FlashUtil>().expect("Flash not found");
-    flash_util.now.read().ok().and_then(|x| (*x).clone() )
-  }
-
-  fn set_flash(&self, val: json::Object) {
-    let flash_util = 
-      self.extensions.get::<FlashUtil>().expect("Flash not found");
-    flash_util.next.write().map(|mut x| *x = Some(val) );
-  }
-
-  // fn flash(&self) -> &FlashUtil {
-  //   self.extensions.get::<FlashUtil>().expect("Flash not found")
-  // }
-
-}
-
-#[test]
-fn it_works() {
+impl AroundMiddleware for Builder {
+    fn around(self, handler: Box<Handler>) -> Box<Handler> {
+        Box::new(Rotator {
+            handler: handler,
+            builder: self
+        }) as Box<Handler>
+    }
 }
