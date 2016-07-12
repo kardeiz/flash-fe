@@ -1,8 +1,7 @@
 extern crate iron;
 extern crate session_fe;
 
-use std::sync::{Arc, RwLock};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::HashMap;
 
 use std::fmt::Debug;
 use std::any::Any;
@@ -38,7 +37,7 @@ impl<T: Flashable + Debug + Clone + Any> Util<T> {
     }
 
     pub fn rotate_in(&mut self, req: &Request) {
-        if let Some(mut obj) = req.extensions.get::<SessionUtil<T>>()
+        if let Some(obj) = req.extensions.get::<SessionUtil<T>>()
             .and_then(|s| s.get() ) {
             if let Some(flash) = obj.flash() {
                 self.now = Some(flash);
@@ -51,17 +50,15 @@ impl<T: Flashable + Debug + Clone + Any> Util<T> {
             if let Some(ref next) = self.next {
                 if let Some(mut obj) = sess.get() {
                     obj.set_flash(Some(next.clone()));
-                    sess.insert(obj);
+                    sess.set(obj);
                 } else {
                     let mut obj = <T>::new();
                     obj.set_flash(Some(next.clone()));
-                    sess.insert(obj);
+                    sess.set(obj);
                 }
-            } else {
-                if let Some(mut obj) = sess.get() {
-                    obj.set_flash(None);
-                    sess.insert(obj);
-                }
+            } else if let Some(mut obj) = sess.get() {
+                obj.set_flash(None);
+                sess.set(obj);
             }            
         }
     }
@@ -88,7 +85,7 @@ impl<T: Flashable + Debug + Clone + Any> Builder<T> {
 
 struct Rotator<H: Handler, T: Flashable + Debug + Clone + Any> {
     handler: H,
-    builder: Builder<T>
+    pd_type: PhantomData<T>
 }
 
 impl<H: Handler, T: Flashable + Debug + Clone + Any + Send + Sync> Handler for Rotator<H, T> {
@@ -116,7 +113,7 @@ impl<T: Flashable + Debug + Clone + Any + Send + Sync> AroundMiddleware for Buil
     fn around(self, handler: Box<Handler>) -> Box<Handler> {
         let rotator = Rotator {
             handler: handler,
-            builder: self
+            pd_type: self.0
         };
         Box::new(rotator) as Box<Handler>
     }

@@ -88,8 +88,6 @@ fn set(req: &mut Request) -> IronResult<Response> {
 
     flash.set(Some(map));
 
-    println!("{:?}", &flash);
-
 
     Ok(res)
 }
@@ -99,8 +97,6 @@ fn get(req: &mut Request) -> IronResult<Response> {
     let mut res = Response::new();
 
     let flash = iexpect!(req.extensions.get::<FlashUtil<Session>>());
-
-    println!("{:?}", &flash);
 
     res
         .set_mut(status::Ok)
@@ -114,8 +110,10 @@ fn main() {
     let sessioning = SessionBuilder::<Session>::new(Helper::key(None));
 
     let mut router = Router::new();
-    router.get("/get", get);
-    router.get("/set", set);
+
+    router
+        .get("/get", get)
+        .get("/set", set);
 
     let flashed = FlashBuilder::<Session>::new().around(Box::new(router));
 
