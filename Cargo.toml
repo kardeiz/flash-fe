@@ -1,14 +1,14 @@
 [package]
 name = "flash-fe"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["kardeiz <kardeiz@gmail.com>"]
 
 [dependencies]
-iron = "0.2"
-rustc-serialize = "0.3"
+iron = "0.3"
 session-fe = { git = "https://github.com/kardeiz/session-fe" }
 
 [dev-dependencies]
+rustc-serialize = "0.3"
 time = "*"
 router = "*"
 cookie-fe = { git = "https://github.com/kardeiz/cookie-fe" }

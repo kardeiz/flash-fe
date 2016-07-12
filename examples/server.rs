@@ -17,7 +17,7 @@ use router::Router;
 
 use cookie_fe::{Util as CookieUtil, Builder as CookieBuilder, CookiePair};
 use session_fe::{Util as SessionUtil, Builder as SessionBuilder};
-use flash_fe::{Util as FlashUtil, Builder as FlashBuilder};
+use flash_fe::{Util as FlashUtil, Builder as FlashBuilder, Flashable};
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -29,6 +29,24 @@ use rand::{thread_rng, Rng};
 const KEY: &'static [u8] = b"4b8eee793a846531d6d95dd66ae48319";
 
 pub struct Helper;
+
+#[derive(Clone, Debug)]
+pub struct Session {
+    flash: Option<HashMap<String,Vec<String>>>
+}
+
+impl Flashable for Session {
+
+    fn new() -> Self { Session { flash: None } }
+
+    fn flash(&self) -> Option<HashMap<String,Vec<String>>> {
+        self.flash.clone()
+    }
+    fn set_flash(&mut self, val: Option<HashMap<String,Vec<String>>>) {
+        self.flash = val;
+    }
+
+}
 
 impl Helper {
 
@@ -62,11 +80,16 @@ fn set(req: &mut Request) -> IronResult<Response> {
 
     let mut res = Response::with((status::Ok, "Set flash"));
 
-    let mut map = BTreeMap::new();
+    let mut map = HashMap::new();
 
-    map.insert("foo".to_string(), 23.to_json());
+    map.insert("foo".to_string(), vec!["hello".to_string()]);
 
-    iexpect!(req.extensions.get_mut::<FlashUtil>()).set(map.to_json() );
+    let flash = iexpect!(req.extensions.get_mut::<FlashUtil<Session>>());
+
+    flash.set(Some(map));
+
+    println!("{:?}", &flash);
+
 
     Ok(res)
 }
@@ -75,24 +98,26 @@ fn get(req: &mut Request) -> IronResult<Response> {
 
     let mut res = Response::new();
 
-    let flash = iexpect!(req.extensions.get::<FlashUtil>()).get();
+    let flash = iexpect!(req.extensions.get::<FlashUtil<Session>>());
+
+    println!("{:?}", &flash);
 
     res
         .set_mut(status::Ok)
-        .set_mut(format!("{:?}", flash));
+        .set_mut(format!("{:?}", flash.get()));
 
     Ok(res)
 }
 
 fn main() {
 
-    let sessioning = SessionBuilder::new(Helper::key(None));
+    let sessioning = SessionBuilder::<Session>::new(Helper::key(None));
 
     let mut router = Router::new();
     router.get("/get", get);
     router.get("/set", set);
 
-    let flashed = FlashBuilder(None).around(Box::new(router));
+    let flashed = FlashBuilder::<Session>::new().around(Box::new(router));
 
     let mut chain = Chain::new(flashed);
     chain.link_before(sessioning);
