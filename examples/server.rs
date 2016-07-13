@@ -16,13 +16,12 @@ use iron::{status, AroundMiddleware};
 use router::Router;
 
 use cookie_fe::{Util as CookieUtil, Builder as CookieBuilder, CookiePair};
-use session_fe::{Util as SessionUtil, Builder as SessionBuilder};
+use session_fe::Builder as SessionBuilder;
 use flash_fe::{Util as FlashUtil, Builder as FlashBuilder, Flashable};
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
-use rustc_serialize::json::{self, ToJson};
-use rustc_serialize::hex::{self, ToHex};
+use rustc_serialize::hex::ToHex;
 
 use rand::{thread_rng, Rng};
 
@@ -52,7 +51,7 @@ impl Helper {
 
     pub fn random() -> String {
         let mut v = [0; 16];
-        rand::thread_rng().fill_bytes(&mut v);
+        thread_rng().fill_bytes(&mut v);
         v.to_hex()
     }
 
@@ -78,7 +77,7 @@ impl Helper {
 
 fn set(req: &mut Request) -> IronResult<Response> {
 
-    let mut res = Response::with((status::Ok, "Set flash"));
+    let res = Response::with((status::Ok, "Set flash"));
 
     let mut map = HashMap::new();
 
@@ -120,7 +119,7 @@ fn main() {
     let mut chain = Chain::new(flashed);
     chain.link_before(sessioning);
 
-    let cookied = CookieBuilder(KEY).around(Box::new(chain));
+    let cookied = CookieBuilder::new(KEY).around(Box::new(chain));
 
     Iron::new(cookied).http("0.0.0.0:3000").unwrap();
 }
