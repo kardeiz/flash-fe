@@ -5,11 +5,12 @@ authors = ["kardeiz <kardeiz@gmail.com>"]
 
 [dependencies]
 iron = "0.3"
-session-fe = { git = "https://github.com/kardeiz/session-fe" }
+session-fe = { git = "https://github.com/kardeiz/session-fe", default-features = false }
 
 [dev-dependencies]
 rustc-serialize = "0.3"
 time = "*"
 router = "*"
 cookie-fe = { git = "https://github.com/kardeiz/cookie-fe" }
+session-fe = { git = "https://github.com/kardeiz/session-fe" }
 rand = "0.3.12"

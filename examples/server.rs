@@ -16,7 +16,7 @@ use iron::{status, AroundMiddleware};
 use router::Router;
 
 use cookie_fe::{Util as CookieUtil, Builder as CookieBuilder, CookiePair};
-use session_fe::Builder as SessionBuilder;
+use session_fe::{Builder as SessionBuilder, helpers as session_helpers};
 use flash_fe::{Util as FlashUtil, Builder as FlashBuilder, Flashable};
 
 use std::collections::HashMap;
@@ -46,34 +46,6 @@ impl Flashable for Session {
     }
 
 }
-
-impl Helper {
-
-    pub fn random() -> String {
-        let mut v = [0; 16];
-        thread_rng().fill_bytes(&mut v);
-        v.to_hex()
-    }
-
-    fn key(sid: Option<&'static str>) -> Box<Fn(&mut Request) -> String + Send + Sync> {
-        let out = move |req: &mut Request| -> String {
-            let jar = req.extensions.get_mut::<CookieUtil>()
-                .and_then(|x| x.jar() )
-                .expect("No cookie jar");
-            let sid = sid.unwrap_or("IRONSID");
-            if let Some(cookie) = jar.signed().find(sid) {
-                cookie.value
-            } else {
-                let key = Self::random();
-                let cookie = CookiePair::new(sid.to_owned(), key.clone());
-                jar.signed().add(cookie);
-                key
-            }
-        };
-        Box::new(out)        
-    }
-}
-
 
 fn set(req: &mut Request) -> IronResult<Response> {
 
@@ -106,7 +78,7 @@ fn get(req: &mut Request) -> IronResult<Response> {
 
 fn main() {
 
-    let sessioning = SessionBuilder::<Session>::new(Helper::key(None));
+    let sessioning = SessionBuilder::<Session>::new(session_helpers::key_gen(None));
 
     let mut router = Router::new();
 
