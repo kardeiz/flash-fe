@@ -15,33 +15,33 @@ use iron::{status, AroundMiddleware};
 
 use router::Router;
 
-use cookie_fe::{Util as CookieUtil, Builder as CookieBuilder, CookiePair};
+use cookie_fe::Builder as CookieBuilder;
 use session_fe::{Builder as SessionBuilder, helpers as session_helpers};
 use flash_fe::{Util as FlashUtil, Builder as FlashBuilder, Flashable};
 
 use std::collections::HashMap;
 
-use rustc_serialize::hex::ToHex;
-
-use rand::{thread_rng, Rng};
-
 const KEY: &'static [u8] = b"4b8eee793a846531d6d95dd66ae48319";
 
-pub struct Helper;
+#[derive(Clone, Debug)]
+pub struct Flash(HashMap<&'static str, Vec<&'static str>>);
 
 #[derive(Clone, Debug)]
 pub struct Session {
-    flash: Option<HashMap<String,Vec<String>>>
+    flash: Option<Flash>
 }
 
 impl Flashable for Session {
 
+    type Object = Flash;
+
     fn new() -> Self { Session { flash: None } }
 
-    fn flash(&self) -> Option<HashMap<String,Vec<String>>> {
+    fn flash(&self) -> Option<Self::Object> {
         self.flash.clone()
     }
-    fn set_flash(&mut self, val: Option<HashMap<String,Vec<String>>>) {
+
+    fn set_flash(&mut self, val: Option<Self::Object>) {
         self.flash = val;
     }
 
@@ -53,11 +53,11 @@ fn set(req: &mut Request) -> IronResult<Response> {
 
     let mut map = HashMap::new();
 
-    map.insert("foo".to_string(), vec!["hello".to_string()]);
+    map.insert("foo", vec!["hello"]);
 
     let flash = iexpect!(req.extensions.get_mut::<FlashUtil<Session>>());
 
-    flash.set(Some(map));
+    flash.set(Some(Flash(map)));
 
 
     Ok(res)

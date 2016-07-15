@@ -1,8 +1,6 @@
 extern crate iron;
 extern crate session_fe;
 
-use std::collections::HashMap;
-
 use std::fmt::Debug;
 use std::any::Any;
 use std::marker::PhantomData;
@@ -15,15 +13,17 @@ use session_fe::Util as SessionUtil;
 
 #[derive(Clone, Debug)]
 pub struct Util<T: Flashable + Debug + Clone + Any> {
-    pub now: Option<HashMap<String,Vec<String>>>,
-    pub next: Option<HashMap<String,Vec<String>>>,
+    pub now: Option<T::Object>,
+    pub next: Option<T::Object>,
     pub pd_type: PhantomData<T>
 }
 
 pub trait Flashable {
+    type Object: Debug + Clone + Any;
+
     fn new() -> Self;
-    fn flash(&self) -> Option<HashMap<String,Vec<String>>>;
-    fn set_flash(&mut self, val: Option<HashMap<String,Vec<String>>>);
+    fn flash(&self) -> Option<Self::Object>;
+    fn set_flash(&mut self, val: Option<Self::Object>);
 }
 
 impl<T: Flashable + Debug + Clone + Any> Util<T> {
@@ -63,11 +63,11 @@ impl<T: Flashable + Debug + Clone + Any> Util<T> {
         }
     }
 
-    pub fn get(&self) -> Option<HashMap<String,Vec<String>>> {
+    pub fn get(&self) -> Option<T::Object> {
         self.now.clone()
     }
 
-    pub fn set(&mut self, value: Option<HashMap<String,Vec<String>>>) {
+    pub fn set(&mut self, value: Option<T::Object>) {
         self.next = value;
     }
 
