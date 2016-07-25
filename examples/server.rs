@@ -37,8 +37,8 @@ impl Flashable for Session {
 
     fn new() -> Self { Session { flash: None } }
 
-    fn flash(&self) -> Option<Self::Object> {
-        self.flash.clone()
+    fn flash(&self) -> Option<&Self::Object> {
+        self.flash.as_ref()
     }
 
     fn set_flash(&mut self, val: Option<Self::Object>) {

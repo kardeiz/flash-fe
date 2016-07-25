@@ -22,7 +22,7 @@ pub trait Flashable {
     type Object: Debug + Clone + Any;
 
     fn new() -> Self;
-    fn flash(&self) -> Option<Self::Object>;
+    fn flash(&self) -> Option<&Self::Object>;
     fn set_flash(&mut self, val: Option<Self::Object>);
 }
 
@@ -40,7 +40,7 @@ impl<T: Flashable + Debug + Clone + Any> Util<T> {
         if let Some(obj) = req.extensions.get::<SessionUtil<T>>()
             .and_then(|s| s.get() ) {
             if let Some(flash) = obj.flash() {
-                self.now = Some(flash);
+                self.now = Some(flash.clone());
             }
         }  
     }
@@ -63,8 +63,8 @@ impl<T: Flashable + Debug + Clone + Any> Util<T> {
         }
     }
 
-    pub fn get(&self) -> Option<T::Object> {
-        self.now.clone()
+    pub fn get(&self) -> Option<&T::Object> {
+        self.now.as_ref()
     }
 
     pub fn set(&mut self, value: Option<T::Object>) {
@@ -115,6 +115,6 @@ impl<T: Flashable + Debug + Clone + Any + Send + Sync> AroundMiddleware for Buil
             handler: handler,
             pd_type: self.0
         };
-        Box::new(rotator) as Box<Handler>
+        Box::new(rotator)
     }
 }
